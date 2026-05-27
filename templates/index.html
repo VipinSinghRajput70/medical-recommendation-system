@@ -1,0 +1,328 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="AI-Powered Personalized Medical Recommendation System (PMRS) - Analyze symptoms, get prognosis and prescriptions instantly.">
+    <title>PMRS - AI Medical Recommendation System</title>
+    <!-- Modern typography via Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body>
+    <div class="glass-bg"></div>
+    
+    <main class="app-container">
+        <!-- Header Profile -->
+        <header class="app-header">
+            <div class="brand">
+                <span class="pulse-icon">
+                    <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="2.5">
+                        <path d="M22 12h-4l-3 9L9 3l-3 9H2" stroke-linecap="round" stroke-linejoin="round"/>
+                    </svg>
+                </span>
+                <div>
+                    <h1>PMRS</h1>
+                    <p class="subtitle">AI Medical Diagnostics & Recommendations</p>
+                </div>
+            </div>
+            <div class="author-tag">
+                <span class="dot"></span>
+                <span>Developer: <strong>Vipin Kumar Singh</strong></span>
+            </div>
+        </header>
+
+        <div class="dashboard-grid">
+            <!-- Left Side: Ingest Symptoms -->
+            <section class="card input-card">
+                <div class="card-header">
+                    <span class="icon">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2">
+                            <path d="M12 2v20M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6" stroke-linecap="round"/>
+                        </svg>
+                    </span>
+                    <h2>Symptom Analyser</h2>
+                </div>
+                
+                <!-- Mode Switcher Pills -->
+                <div class="mode-switcher">
+                    <button class="mode-btn active" data-mode="checklist">Symptom Selector</button>
+                    <button class="mode-btn" data-mode="nlp">Clinical AI Consult</button>
+                </div>
+
+                <p class="card-desc" id="mode-desc">Search and select one or more symptoms below to compile a diagnosis report.</p>
+
+                <!-- Input Panel A: Checklist Selector -->
+                <div id="panel-checklist" class="input-panel">
+                    <!-- Search Input with Searchable Combobox dropdown -->
+                    <div class="search-container">
+                        <label for="symptom-input" class="sr-only">Search symptoms</label>
+                        <div class="input-wrapper">
+                            <input type="text" id="symptom-input" placeholder="Type symptom e.g. headache, fever..." autocomplete="off">
+                            <span class="search-icon">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2">
+                                    <circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/>
+                                </svg>
+                            </span>
+                        </div>
+                        <!-- Autocomplete dropdown list -->
+                        <div id="autocomplete-list" class="autocomplete-dropdown hidden"></div>
+                    </div>
+
+                    <!-- Selected Symptoms Tags Panel -->
+                    <div class="tags-container">
+                        <div class="tags-header">
+                            <h3>Selected Symptoms</h3>
+                            <span id="tags-count" class="badge">0</span>
+                        </div>
+                        <div id="active-tags" class="tags-list">
+                            <p class="no-tags-placeholder">No symptoms selected yet. Type above to add.</p>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Input Panel B: NLP Text consultation -->
+                <div id="panel-nlp" class="input-panel hidden">
+                    <div class="nlp-container">
+                        <label for="nlp-input" class="sr-only">Describe symptoms</label>
+                        <textarea id="nlp-input" placeholder="Consult our Clinical AI. Describe your symptoms in detail using natural language (e.g. 'I have a sharp headache, blurred vision, and dizziness since yesterday morning...')" rows="6"></textarea>
+                        <div class="character-helper">
+                            <span class="char-icon">💡</span>
+                            <span id="char-warning">Please enter a detailed description of minimum 10 characters.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Control Buttons -->
+                <div class="controls-row">
+                    <button id="btn-reset" class="btn btn-secondary">
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                            <path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8m0 0V3m0 5h5"/>
+                        </svg>
+                        Reset
+                    </button>
+                    <button id="btn-predict" class="btn btn-primary" disabled>
+                        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14M22 4 12 14.01l-3-3" stroke-linecap="round" stroke-linejoin="round"/>
+                        </svg>
+                        Analyze Symptoms
+                    </button>
+                </div>
+            </section>
+
+            <!-- Right Side: Diagnostic Report Output -->
+            <section class="card output-card disabled-state" id="report-card">
+                <!-- Welcome/Placeholder State -->
+                <div id="output-welcome" class="output-fallback">
+                    <div class="pulse-container">
+                        <div class="ring-pulse"></div>
+                        <div class="medical-cross">✚</div>
+                    </div>
+                    <h3>Waiting for Analysis</h3>
+                    <p>Select your symptoms and press "Analyze Symptoms" to generate your detailed diagnostic report.</p>
+                </div>
+
+                <!-- Loader State -->
+                <div id="output-loader" class="output-fallback hidden">
+                    <div class="spinner"></div>
+                    <h3>Running Diagnostics...</h3>
+                    <p>Analyzing symptom vectors using optimized SVC machine learning model.</p>
+                </div>
+
+                <!-- Actual Diagnostic Report State -->
+                <div id="output-report" class="report-content hidden">
+                    <!-- Diagnosis Result Badge -->
+                    <div class="diagnosis-banner">
+                        <div class="banner-header">
+                            <span class="report-badge">PROGNOSIS REPORT</span>
+                            <span class="confidence-rating">Model Accuracy: 100%</span>
+                        </div>
+                        <h2 id="predicted-disease">Primary Condition</h2>
+                    </div>
+
+                    <!-- Differential Diagnosis Selector -->
+                    <div class="differential-section">
+                        <h3>Differential Diagnosis <span class="help-text">(Ranked by likelihood - click to load report)</span></h3>
+                        <div id="differential-list" class="diff-list">
+                            <!-- Differential diagnosis items will be dynamically generated here -->
+                        </div>
+                    </div>
+
+                    <!-- Interactive Report Tabs Navigation -->
+                    <nav class="report-tabs">
+                        <button class="tab-btn active" data-tab="tab-desc">
+                            <span>Overview</span>
+                        </button>
+                        <button class="tab-btn" data-tab="tab-precaution">
+                            <span>Precautions</span>
+                        </button>
+                        <button class="tab-btn" data-tab="tab-meds">
+                            <span>Medications</span>
+                        </button>
+                        <button class="tab-btn" data-tab="tab-diet">
+                            <span>Diets</span>
+                        </button>
+                        <button class="tab-btn" data-tab="tab-workout">
+                            <span>Recovery Tips</span>
+                        </button>
+                    </nav>
+
+                    <!-- Tab Contents -->
+                    <div class="tab-view-container">
+                        <!-- Tab: Description -->
+                        <div id="tab-desc" class="tab-pane active">
+                            <h3>Disease Summary</h3>
+                            <p id="disease-desc" class="narrative-text">Loading...</p>
+                        </div>
+
+                        <!-- Tab: Precaution -->
+                        <div id="tab-precaution" class="tab-pane">
+                            <h3>Preventive Measures</h3>
+                            <ul id="disease-precautions" class="checklist-items">
+                                <!-- Will be dynamically populated -->
+                            </ul>
+                        </div>
+
+                        <!-- Tab: Medications -->
+                        <div id="tab-meds" class="tab-pane">
+                            <h3>Suggested Treatments</h3>
+                            <div class="clinical-warning">
+                                <span class="warning-icon">⚠️</span>
+                                <p>Medications shown are for clinical reference only. Consult a doctor before ingestion.</p>
+                            </div>
+                            <ul id="disease-medications" class="medical-list">
+                                <!-- Will be dynamically populated -->
+                            </ul>
+                        </div>
+
+                        <!-- Tab: Diet -->
+                        <div id="tab-diet" class="tab-pane">
+                            <h3>Nutritional Recommendations</h3>
+                            <ul id="disease-diet" class="diet-list">
+                                <!-- Will be dynamically populated -->
+                            </ul>
+                        </div>
+
+                        <!-- Tab: Workout/Recovery -->
+                        <div id="tab-workout" class="tab-pane">
+                            <h3>Recovery & Health Guidelines</h3>
+                            <ul id="disease-workout" class="recovery-list">
+                                <!-- Will be dynamically populated -->
+                            </ul>
+                        </div>
+                    </div>
+
+                    <!-- Download Report Action Bar -->
+                    <div class="download-bar" id="download-bar">
+                        <span class="download-label">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 15V3m0 12-4-4m4 4 4-4M2 17l.621 2.485A2 2 0 0 0 4.561 21h14.878a2 2 0 0 0 1.94-1.515L22 17"/></svg>
+                            Save Report:
+                        </span>
+                        <button id="btn-download-pdf" class="btn-download btn-dl-pdf" title="Download full report as PDF">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+                            Download PDF
+                        </button>
+                        <button id="btn-download-txt" class="btn-download btn-dl-txt" title="Download full report as plain text">
+                            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                            Download Text
+                        </button>
+                    </div>
+
+                    <!-- Live Health Intelligence Panel (BigQuery) -->
+                    <div class="intel-panel" id="intel-panel">
+                        <div class="intel-header">
+                            <div class="intel-title">
+                                <span class="intel-icon">
+                                    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                        <circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>
+                                    </svg>
+                                </span>
+                                <span>Live Health Intelligence</span>
+                                <span class="intel-badge">POWERED BY GOOGLE BIGQUERY</span>
+                            </div>
+                            <button class="intel-toggle" id="intel-toggle" aria-label="Toggle panel">
+                                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="6 9 12 15 18 9"/>
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div class="intel-body" id="intel-body">
+                            <!-- Loading state -->
+                            <div id="intel-loader" class="intel-loader">
+                                <div class="intel-spinner"></div>
+                                <span>Fetching live data from Google BigQuery...</span>
+                            </div>
+
+                            <!-- Unconfigured state -->
+                            <div id="intel-unconfigured" class="intel-notice hidden">
+                                <span class="notice-icon">🔑</span>
+                                <div>
+                                    <strong>BigQuery not configured</strong>
+                                    <p id="intel-notice-msg">Add your GCP credentials to enable live health data.</p>
+                                    <a href="https://console.cloud.google.com" target="_blank" class="intel-setup-link">
+                                        Set up Google Cloud →
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- Error state -->
+                            <div id="intel-error" class="intel-notice intel-error-state hidden">
+                                <span class="notice-icon">⚠️</span>
+                                <div>
+                                    <strong>Could not load live data</strong>
+                                    <p id="intel-error-msg">Unknown error.</p>
+                                </div>
+                            </div>
+
+                            <!-- Data state -->
+                            <div id="intel-data" class="intel-data-view hidden">
+                                <!-- Disease Stats Cards Row -->
+                                <div class="intel-section-label" id="intel-label-burden">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="m19 9-5 5-4-4-3 3"/></svg>
+                                    <span id="intel-burden-text">Global Disease Burden</span>
+                                </div>
+                                <div class="intel-stat-row" id="intel-stats-row">
+                                    <!-- Populated by JS -->
+                                </div>
+
+                                <!-- Top Countries Table -->
+                                <div class="intel-section-label" style="margin-top:1rem" id="intel-label-countries">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                                    <span id="intel-countries-text">Top 5 Affected Countries</span>
+                                </div>
+                                <div class="intel-countries" id="intel-countries">
+                                    <!-- Populated by JS -->
+                                </div>
+
+                                <!-- Health Indicators -->
+                                <div class="intel-section-label" style="margin-top:1rem">
+                                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+                                    India Health Indicators (World Bank)
+                                </div>
+                                <div class="intel-indicators" id="intel-indicators">
+                                    <!-- Populated by JS -->
+                                </div>
+
+                                <div class="intel-source" id="intel-source-label"></div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+            </section>
+        </div>
+
+
+        <!-- Footer containing medical warning & authorship -->
+        <footer class="app-footer">
+            <p><strong>Disclaimer:</strong> This system uses a machine learning classifier for demonstration purposes. Do not use for actual medical diagnoses.</p>
+            <p>&copy; 2026. Designed and Developed by <strong>Vipin Kumar Singh</strong>.</p>
+        </footer>
+    </main>
+
+    <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
