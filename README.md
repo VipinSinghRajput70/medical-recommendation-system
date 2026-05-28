@@ -172,3 +172,7 @@ user_symptoms = ["itching", "skin_rash", "nodal_skin_eruptions"]
 * **Project Repository:** [Medical-Recommadation-System](https://github.com/VipinSinghRajput70/Medical-Recommadation-System)
 
 If you find this project useful, feel free to star the repository and contribute to its enhancement!
+
+## Live Demo
+
+https://medical-recommendation-system-7s0n.onrender.com
