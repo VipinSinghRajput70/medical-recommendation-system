@@ -22,8 +22,8 @@ except Exception as e:
 
 # Load CSV datasets
 try:
-    description_df = pd.read_csv(os.path.join(DATASETS_DIR, "description.csv"))
-    precautions_df = pd.read_csv(os.path.join(DATASETS_DIR, "precautions_df.csv"))
+    description_df = pd.read_csv(os.path.join(DATASETS_DIR, "symptom_Description.csv"))
+    precautions_df = pd.read_csv(os.path.join(DATASETS_DIR, "symptom_precaution.csv"))
     medications_df = pd.read_csv(os.path.join(DATASETS_DIR, "medications.csv"))
     diets_df = pd.read_csv(os.path.join(DATASETS_DIR, "diets.csv"))
     workout_df = pd.read_csv(os.path.join(DATASETS_DIR, "workout_df.csv"))
