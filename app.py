@@ -219,54 +219,185 @@ def predict():
     except Exception as e:
         return jsonify({"error": f"Prediction failed: {str(e)}"}), 500
 
-# Lazy-loading Hugging Face zero-shot pipeline to avoid startup delay or package installation blocks
-nlp_classifier = None
+import re
 
-def get_nlp_classifier():
-    global nlp_classifier
-    if nlp_classifier is None:
-        from transformers import pipeline
-        # Load lightweight multi-genre NLI zero-shot classifier model (approx 268 MB)
-        nlp_classifier = pipeline("zero-shot-classification", model="typeform/distilbert-base-uncased-mnli")
-    return nlp_classifier
+def extract_symptoms_from_text(text):
+    """
+    Lightweight keyword-based NLP: scans the user's natural language description
+    and extracts matching symptoms from the known symptoms_dict.
+    Handles underscores vs spaces, partial phrase matching, and common aliases.
+    """
+    # Normalise input: lowercase, remove punctuation noise
+    text_lower = re.sub(r"[^\w\s]", " ", text.lower())
+    text_lower = re.sub(r"\s+", " ", text_lower).strip()
+
+    matched = []
+
+    # Common aliases / layman terms → canonical symptom names
+    aliases = {
+        "fever": ["high_fever", "mild_fever"],
+        "high fever": ["high_fever"],
+        "mild fever": ["mild_fever"],
+        "temperature": ["high_fever"],
+        "runny nose": ["runny_nose"],
+        "stuffy nose": ["congestion"],
+        "blocked nose": ["congestion"],
+        "sore throat": ["patches_in_throat", "throat_irritation"],
+        "throat irritation": ["throat_irritation"],
+        "stomach ache": ["stomach_pain", "abdominal_pain"],
+        "belly pain": ["belly_pain", "abdominal_pain"],
+        "tummy pain": ["abdominal_pain"],
+        "chest pain": ["chest_pain"],
+        "back pain": ["back_pain"],
+        "neck pain": ["neck_pain"],
+        "knee pain": ["knee_pain"],
+        "hip pain": ["hip_joint_pain"],
+        "joint pain": ["joint_pain"],
+        "muscle pain": ["muscle_pain"],
+        "muscle weakness": ["muscle_weakness"],
+        "tired": ["fatigue", "lethargy"],
+        "tiredness": ["fatigue"],
+        "exhausted": ["fatigue"],
+        "weakness": ["fatigue", "weakness_in_limbs"],
+        "dizzy": ["dizziness"],
+        "dizziness": ["dizziness"],
+        "nausea": ["nausea"],
+        "nauseous": ["nausea"],
+        "vomit": ["vomiting"],
+        "vomiting": ["vomiting"],
+        "diarrhea": ["diarrhoea"],
+        "diarrhoea": ["diarrhoea"],
+        "loose stool": ["diarrhoea"],
+        "itching": ["itching"],
+        "itchy": ["itching"],
+        "rash": ["skin_rash"],
+        "skin rash": ["skin_rash"],
+        "blister": ["blister"],
+        "swelling": ["swelling_joints", "swelling_of_stomach"],
+        "swollen": ["swelled_lymph_nodes", "swollen_legs"],
+        "headache": ["headache"],
+        "head pain": ["headache"],
+        "migraine": ["headache"],
+        "cough": ["cough"],
+        "sneezing": ["continuous_sneezing"],
+        "shortness of breath": ["breathlessness"],
+        "breathless": ["breathlessness"],
+        "difficulty breathing": ["breathlessness"],
+        "chills": ["chills"],
+        "shivering": ["shivering"],
+        "sweating": ["sweating"],
+        "night sweats": ["sweating"],
+        "dehydration": ["dehydration"],
+        "thirst": ["dehydration"],
+        "weight loss": ["weight_loss"],
+        "weight gain": ["weight_gain"],
+        "anxiety": ["anxiety"],
+        "depression": ["depression"],
+        "irritability": ["irritability"],
+        "mood swings": ["mood_swings"],
+        "constipation": ["constipation"],
+        "indigestion": ["indigestion"],
+        "acidity": ["acidity"],
+        "heartburn": ["acidity"],
+        "loss of appetite": ["loss_of_appetite"],
+        "no appetite": ["loss_of_appetite"],
+        "increased appetite": ["increased_appetite"],
+        "yellowing": ["yellowing_of_eyes", "yellowish_skin"],
+        "jaundice": ["yellowish_skin", "yellowing_of_eyes"],
+        "yellow eyes": ["yellowing_of_eyes"],
+        "yellow skin": ["yellowish_skin"],
+        "dark urine": ["dark_urine"],
+        "blood in urine": ["burning_micturition"],
+        "painful urination": ["burning_micturition"],
+        "frequent urination": ["continuous_feel_of_urine", "polyuria"],
+        "blurred vision": ["blurred_and_distorted_vision"],
+        "vision problem": ["blurred_and_distorted_vision", "visual_disturbances"],
+        "red eyes": ["redness_of_eyes"],
+        "watery eyes": ["watering_from_eyes"],
+        "palpitations": ["palpitations"],
+        "fast heartbeat": ["fast_heart_rate"],
+        "rapid heart": ["fast_heart_rate"],
+        "stiff neck": ["stiff_neck"],
+        "obesity": ["obesity"],
+        "acne": ["pus_filled_pimples", "blackheads"],
+        "pimples": ["pus_filled_pimples"],
+    }
+
+    # 1. Check aliases first
+    for alias, targets in aliases.items():
+        if alias in text_lower:
+            for t in targets:
+                if t in symptoms_dict and t not in matched:
+                    matched.append(t)
+
+    # 2. Direct symptom name matching (underscores replaced with spaces)
+    for symptom in symptoms_dict:
+        symptom_readable = symptom.replace("_", " ").strip()
+        if symptom_readable in text_lower and symptom not in matched:
+            matched.append(symptom)
+
+    # 3. Single-word token matching for remaining unmatched symptoms
+    tokens = set(text_lower.split())
+    for symptom in symptoms_dict:
+        if symptom in matched:
+            continue
+        parts = [p for p in re.split(r"[_\s]+", symptom) if len(p) > 3]
+        if parts and all(p in tokens for p in parts):
+            matched.append(symptom)
+
+    return matched
+
 
 @app.route("/api/predict_nlp", methods=["POST"])
 def predict_nlp():
     """
-    Accept natural language symptom descriptions, execute Zero-Shot Classification via DistilBERT,
-    rank top 3 match probabilities, and fetch associated health reports.
+    Accept natural language symptom descriptions, extract symptoms via keyword NLP,
+    run the SVC model and return top 3 differential diagnoses with health reports.
+    No heavy ML libraries required — uses the same SVC model as the checklist mode.
     """
+    if svc_model is None:
+        return jsonify({"error": "Machine learning model file 'svc.pkl' is not loaded."}), 500
+
     data = request.get_json() or {}
     narrative = data.get("description", "").strip()
 
     if not narrative or len(narrative) < 10:
         return jsonify({"error": "Symptom description is too short. Please describe in detail (minimum 10 characters)."}), 400
 
-    try:
-        classifier = get_nlp_classifier()
-    except Exception as e:
+    # Extract symptoms from free text
+    matched_symptoms = extract_symptoms_from_text(narrative)
+
+    if not matched_symptoms:
         return jsonify({
-            "error": f"Failed to initialize Clinical NLP model: {str(e)}. "
-                     "Please verify that deep learning libraries are fully installed and the server has internet access."
-        }), 500
+            "error": "No recognisable symptoms were found in your description. "
+                     "Try including specific terms like 'headache', 'fever', 'nausea', 'chest pain', etc."
+        }), 400
+
+    # Build feature vector and run SVC — same as checklist mode
+    input_vector = np.zeros(len(symptoms_dict))
+    for symptom in matched_symptoms:
+        input_vector[symptoms_dict[symptom]] = 1.0
 
     try:
-        # Generate target categories list from our 41 diseases
-        candidates = list(set([dis.strip() for dis in diseases_list.values()]))
-        
-        # Perform Zero-Shot Classification
-        classification_result = classifier(narrative, candidate_labels=candidates)
-        
-        top_labels = classification_result['labels'][:3]
-        top_scores = classification_result['scores'][:3]
-        
+        decision_scores = svc_model.decision_function([input_vector])[0]
+        e_x = np.exp(decision_scores - np.max(decision_scores))
+        probabilities = e_x / e_x.sum()
+
+        ranked_results = []
+        for class_idx, prob in enumerate(probabilities):
+            disease = diseases_list.get(class_idx, "Unknown Condition")
+            ranked_results.append({"disease": disease, "probability": round(float(prob) * 100, 1)})
+
+        ranked_results = sorted(ranked_results, key=lambda x: x["probability"], reverse=True)
+        top_results = ranked_results[:3]
+
         differential_diagnoses = []
-        for label, score in zip(top_labels, top_scores):
-            desc, precautions, medications, diets, workouts = query_recommendations(label)
-            
+        for res in top_results:
+            dis_name = res["disease"]
+            desc, precautions, medications, diets, workouts = query_recommendations(dis_name)
             differential_diagnoses.append({
-                "disease": label,
-                "probability": round(float(score) * 100, 1),
+                "disease": dis_name,
+                "probability": res["probability"],
                 "details": {
                     "description": desc,
                     "precautions": precautions,
@@ -275,9 +406,10 @@ def predict_nlp():
                     "workouts": workouts
                 }
             })
-            
+
         return jsonify({
             "status": "success",
+            "matched_symptoms": matched_symptoms,
             "differential_diagnoses": differential_diagnoses
         })
     except Exception as e:

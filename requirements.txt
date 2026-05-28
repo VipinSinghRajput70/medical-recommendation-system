@@ -2,8 +2,3 @@ flask
 pandas
 numpy
 scikit-learn>=1.6.0
-transformers
-torch
-google-cloud-bigquery
-pandas-gbq
-db-dtypes
